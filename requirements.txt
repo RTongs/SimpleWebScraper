@@ -1,0 +1,4 @@
+selenium
+selenium-stealth
+boto3
+webdriver-manager

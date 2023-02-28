@@ -1,0 +1,3 @@
+Commands:
+cd D:\Projects\SimpleWebScraper
+pip install -r .\requirements.txt
