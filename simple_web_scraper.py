@@ -1,6 +1,5 @@
-import logging # Let's setup together
-import time
-import boto3
+import boto3, uuid, time, logging
+from decimal import Decimal
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from selenium import webdriver
@@ -13,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Define our data structures
 class WeatherDatum:
     def __init__(self, city: str, date: str, min_temp: int, max_temp: int, summary: str,
-                 rain_amount: float, rain_prob: int, wind_speed: float,
+                 rain_amount: Decimal, rain_prob: int, wind_speed: Decimal,
                  wind_dir: str, pressure: int, humidity: int, uv: int,
                  dew_point: int):
         self.city = city
@@ -163,12 +162,12 @@ def scrape_weather_website(driver, city):
         rain_amount = driver.find_element(By.XPATH, f'//div[@class="daily-detail-container"]/ul/li[1]/span[1]').text
         if '%' in rain_amount:
             rain_prob = int(rain_amount.replace('%',''))
-            rain_amount = float(0)
+            rain_amount = Decimal(0)
         else:
-            rain_amount = float(rain_amount.replace('mm',''))
+            rain_amount = Decimal(rain_amount.replace('mm',''))
             rain_prob = int(driver.find_element(By.XPATH, f'//div[@class="daily-detail-container"]/ul/li[1]/span[2]').text.replace('(','').replace('%)',''))
         wind_data = driver.find_element(By.XPATH, f'//div[@class="daily-detail-container"]/ul/li[2]/div').text
-        wind_speed = float(wind_data.split(' ')[0].replace('m/s',''))
+        wind_speed = Decimal(wind_data.split(' ')[0].replace('m/s',''))
         wind_dir = wind_data.split(' ')[1].strip()
         pressure = int(driver.find_element(By.XPATH, f'//div[@class="daily-detail-container"]/ul/li[3]').text.replace('hPa',''))
         humidity = int(driver.find_element(By.XPATH, f'//div[@class="daily-detail-container"]/ul/li[4]').text.split('\n')[1].replace('%',''))
@@ -192,9 +191,14 @@ def get_city_infos_cloud(dynamo_db_client):
     DO
     """
     configuration_table = dynamo_db_client.Table(CITY_TABLE_NAME)
-    all_city_info = configuration_table.scan()
-    # do something with the info here
-    return None
+    # Scan can only return 1MB of data, fine for us
+    response = configuration_table.scan()
+    city_infos = []
+    if len(response['Items']) != 0:
+        all_city_info = response['Items']
+        for i in range(len(all_city_info)):
+            city_infos.append(CityInfo(all_city_info[i]['Name'], all_city_info[i]['URL']))
+    return city_infos
 
 def write_to_dynamo_db(dynamo_db_client, weather_data):
     """
@@ -205,7 +209,8 @@ def write_to_dynamo_db(dynamo_db_client, weather_data):
         for day_count, weather_datum in enumerate(weather_data):
             city_table.put_item(
                 Item={
-                    'City': weather_datum.city_name,
+                    'Id': str(uuid.uuid4()),
+                    'City': weather_datum.city,
                     'Date': weather_datum.date,
                     'DaysFromDate': day_count,
                     'MinTemp': weather_datum.min_temp,
