@@ -50,7 +50,7 @@ class CityInfo:
         self.URL = URL
 
 # Can toggle on and off to demonstrate
-CLOUD = False
+CLOUD = True
 
 REGION_CONFIG = Config(
             region_name = 'ap-southeast-2',
@@ -64,6 +64,8 @@ WEATHER_TABLE_NAME = 'Weather'
 
 # Entrypoint to the program
 def main():
+    logging.basicConfig(level=logging.INFO)
+    logging.info('Starting to scrape!')
     # Automatically picks up credentials for our AWS from our environment variables passed into container
     dynamo_db_client = boto3.resource('dynamodb',
                        config = REGION_CONFIG)
@@ -86,6 +88,13 @@ def main():
     exit(0)
 
 def get_city_infos():
+    """
+    Get hard coded cities to scrape
+
+    Returns
+    -------
+    List containing populated CityInfo instances
+    """
     city_infos = []
     city_infos.append(CityInfo('Sydney', 'https://openweathermap.org/city/2147714'))
     city_infos.append(CityInfo('Brisbane', 'https://openweathermap.org/city/2174003'))
@@ -94,7 +103,11 @@ def get_city_infos():
 
 def get_driver():
     """
-    DO
+    Setup a selenium web driver with stealthy and useful arguments added
+
+    Returns
+    -------
+    A web driver that is setup for Chrome
     """
     chrome_service = Service(ChromeDriverManager().install())
     chrome_options = webdriver.ChromeOptions()
@@ -182,13 +195,32 @@ def scrape_weather_website(driver, city):
     return weather_data
 
 def print_weather_data(weather_data):
+    """
+    Print the string representation of each WeatherDatum
+
+    Parameters
+    ----------
+    weather_data: WeatherDatum[]
+        Ordered list of WeatherDatum
+    """
     for count, weather_datum in enumerate(weather_data):
         print(f'{count} days from date')
         print(str(weather_datum))
 
 def get_city_infos_cloud(dynamo_db_client):
     """
-    DO
+    Collect every element in our City table, with a limit of 1MB of data
+    This is more useful than hard coding, as we can change what cities we scrape without having
+    to change out code
+
+    Parameters
+    ----------
+    dynamo_db_client: Session.resource
+        boto3 resource set to connect to our dynamoDB database
+
+    Returns
+    -------
+    List of CityInfo
     """
     configuration_table = dynamo_db_client.Table(CITY_TABLE_NAME)
     # Scan can only return 1MB of data, fine for us
@@ -202,7 +234,14 @@ def get_city_infos_cloud(dynamo_db_client):
 
 def write_to_dynamo_db(dynamo_db_client, weather_data):
     """
-    DO (assume ordering of dates!)
+    Using the boto3 client, connect to the weather table and upload each item in our list
+
+    Parameters
+    ----------
+    dynamo_db_client: Session.resource
+        boto3 resource set to connect to our dynamoDB database
+    weather_data: WeatherDatum[]
+        List that is ordered from today to 7 days away of WeatherDatum
     """
     city_table = dynamo_db_client.Table(WEATHER_TABLE_NAME)
     try:
@@ -226,7 +265,7 @@ def write_to_dynamo_db(dynamo_db_client, weather_data):
                     'DewPoint': weather_datum.dew_point
                 })
     except ClientError as err:
-        # Log the error: err.response['Error']['Code'], err.response['Error']['Message']
+        logging.error(f"Error received from {WEATHER_TABLE_NAME} table, {err.response['Error']['Code']}: {err.response['Error']['Message']}")
         raise
 
 if __name__ == "__main__":

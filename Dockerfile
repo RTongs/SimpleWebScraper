@@ -41,9 +41,9 @@ RUN pip install -r /app/requirements.txt
 
 COPY . /app
 
+# For debugging the container
 EXPOSE 8080
 
 ENTRYPOINT [ "python" ]
 
 CMD ["simple_web_scraper.py"]
-
