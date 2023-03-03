@@ -1,3 +1,21 @@
 Commands:
 cd D:\Projects\SimpleWebScraper
 pip install -r .\requirements.txt
+docker build -t ryans_simple_web_scraper .
+docker tag ryans_simple_web_scraper:latest public.ecr.aws/m2u2b4f3/ryans_simple_web_scraper:latest
+docker push public.ecr.aws/m2u2b4f3/ryans_simple_web_scraper:latest
+
+-- For ECS permissions:
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
